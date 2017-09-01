@@ -1,5 +1,30 @@
+/*
+(C) 2015 dingus.dk J.Ø.N.
+
+This file is part of ArduinoIHC.
+
+ArduinoIHC is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+ArduinoIHC is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with ArduinoIHC.  If not, see <http://www.gnu.org/licenses/>.
+*/
+#define IHC_USEPINCHANGEINT
 #include <Arduino.h>
-#include <PinChangeInt.h>
+#ifndef ESP8266
+	#ifdef IHC_USEPINCHANGEINT
+		#include <PinChangeInt.h>
+	#else
+		#include <pcint.h>
+	#endif
+#endif
 #include "IHCinput.h"
 
 #define STARTPULSELENGTH 2500
@@ -12,20 +37,20 @@ IHCinput* IHCinput::pTheFirst = NULL;
 IHCinput::IHCinput() {
 
 	dataline = 0;
+#ifndef IHCINPUT_NO_MULTIPORTSUPPORT
 	pNext = NULL;
+#endif
 }
 
-IHCinput::~IHCinput() {
-
-	//	detachInterrupt(0);
-}
 
 void IHCinput::Begin( int pin) {
 
 	// We can only call begin one time, and we can only have one object
 	if (dataline != 0) return;
 
+#ifndef IHCINPUT_NO_MULTIPORTSUPPORT
 	pNext = pTheFirst;
+#endif
 	pTheFirst = this;
 
 	this->pin = pin;
@@ -35,25 +60,44 @@ void IHCinput::Begin( int pin) {
 	changemask = 0;
 	input = 0;
 	startpulse = micros();
-	attachPinChangeInterrupt( pin, _PinChange, CHANGE); // Any state change will trigger the interrupt.
+	// Any state change will trigger the interrupt.
+#ifdef ESP8266
+	attachInterrupt(digitalPinToInterrupt(pin), _PinChangeInterrupt, CHANGE);
+#else
+	#ifdef IHC_USEPINCHANGEINT
+		attachPinChangeInterrupt( pin, _PinChangeInterrupt, CHANGE); 
+	#else
+		PCattachInterrupt(pin, _PinChangeInterrupt, CHANGE);
+	#endif
+#endif
 }
 
 
-void IHCinput::_PinChange() {
+void ICACHE_RAM_ATTR IHCinput::_PinChangeInterrupt() {
 
 	IHCinput* pInput = pTheFirst;
-	byte intpin = PCintPort::arduinoPin;
-	while (pInput->pin != intpin) {
-		pInput = pInput->pNext;
-		if (pInput == NULL) return;
-	}
-	pInput->PinChange();
+#ifdef ESP8266
+	pInput->PinChangeInterrupt(digitalRead(pInput->pin));
+#else
+	#ifndef IHCINPUT_NO_MULTIPORTSUPPORT
+		byte intpin = PCintPort::arduinoPin;
+		while (pInput->pin != intpin) {
+			pInput = pInput->pNext;
+			if (pInput == NULL) return;
+		}
+	#endif
+	#ifdef IHC_USEPINCHANGEINT
+		pInput->PinChangeInterrupt(PCintPort::pinState);
+	#else
+		pInput->PinChangeInterrupt( digitalRead( pInput->pin));
+	#endif
+#endif
 }
 
-void IHCinput::PinChange() {
+void IHCinput::PinChangeInterrupt(byte pinstate) {
 
 	unsigned long time = micros();
-	if (PCintPort::pinState) {
+	if (pinstate) {
 		startpulse = time;
 	}
 	else {
@@ -64,6 +108,8 @@ void IHCinput::PinChange() {
 			if (l > STARTPULSELENGTH) {
 				// We have a start
 				dataline = 0;
+				newinput = 0;
+				parity = 0;
 			}
 		}
 		else {
@@ -78,30 +124,24 @@ void IHCinput::PinChange() {
 					// bit 16 is parity
 					// done - now search for start pulse again
 					dataline = -1;
-					byte mask = 0x01;
-					byte newinput = 0;
-					byte parity = 0;
-					for (int i = 0; i < 8; i++) {
-						if (pulse_duration[i] < THRESSHOLDPULSELENGTH) {
-							newinput |= mask;
-							parity++;
-						}
-						mask <<= 1;
-					}
+					// parity error ?
 					if ((l > THRESSHOLDPULSELENGTH) ^ (parity & 0x01)) {
-						// parity error
 						return;
 					}
 					changemask |= input ^ newinput;
 					if (changemask) {
 						input = newinput;
+#ifndef IHCINPUT_NO_CALLBACK
 						OnChange(changemask, input);
+#endif
 					}
 				}
-				dataline++;
-				return;
 			}
-			pulse_duration[dataline++] = l;
+			else if (l < THRESSHOLDPULSELENGTH) {
+				newinput |= 1 << dataline;
+				parity++;
+			}
+			dataline++;
 		}
 	}
 }
@@ -116,9 +156,11 @@ byte IHCinput::GetInput() {
 }
 
 
+#ifndef IHCINPUT_NO_CALLBACK
 void IHCinput::OnChange(byte changemask, byte data) {
 
 }
+#endif
 
 byte IHCinput::GetChangeMask() {
 

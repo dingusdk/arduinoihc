@@ -1,145 +1,78 @@
+/*
+(C) 2015 dingus.dk J.Ø.N.
+
+This file is part of ArduinoIHC.
+
+ArduinoIHC is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+ArduinoIHC is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with ArduinoIHC.  If not, see <http://www.gnu.org/licenses/>.
+*/
 #include <Arduino.h>
-#include "IHCOutput.h"
+#include "IHCoutput.h"
+#ifndef IHC_NOTEMPERATURE
+#include <IHCtemperature.h>
+#endif
+
+IHCoutput* IHCoutput::pTheFirst = NULL;
 
 
-IHCOutput TheIHCOutput;
+IHCoutput::IHCoutput() {
 
-IHCOutput* IHCOutput::pTheOneAndOnly = NULL;
-
-IHCOutput::IHCTemperature::IHCTemperature(int ch) {
-
-	channel = ch;
-	memset( &data, 0, sizeof(data));
-	bitpos = 0;
-	gulvibrug = false;
-	next = NULL;
-	starttime = 0;
-}
-
-word NibbleChecksum(int n) {
-
-	return ((n >> 8) & 0x000f) + ((n >> 4) & 0x000f) + (n & 0x000f);
-}
-
-void IHCOutput::IHCTemperature::Init() {
-
-	int rum = int(temperature * 10.0);
-	int h = int(humidity * 10.0);
-	int gulv = int(gulvtemp * 10.0);
-	word checksum_rum = NibbleChecksum(rum);
-	word checksum_h = NibbleChecksum( h);
-	word checksum_gulv = NibbleChecksum( gulv);
-	word checksum_5bit = ((checksum_rum + checksum_h + checksum_gulv) & 0x001F);
-	if (gulvibrug)
-		checksum_5bit = checksum_5bit & 0x000F;
-	else {
-		checksum_5bit |= 0x0010;
-		checksum_5bit ^= 0x0008;
-	}
-	memset(&data, 0, sizeof(data));
-	bitpos = 0;
-	AddBits(rum);
-	AddBits(h);
-	AddBits(gulv);
-	AddBits(checksum_5bit, 5);
-
-	starttime = millis();
-	IHCOutput::pTheOneAndOnly->Set(channel, HIGH);
-}
-
-void IHCOutput::IHCTemperature::Tick() {
-
-	if (starttime == 0) {
-		Init();
-		return;
-	}
-	unsigned long time = millis();
-	long dt = time - starttime;
-	int bitnr = dt / 122;
-	if (bitnr >= 41) {
-		// Wait 10 sec until next update
-		if (dt > 10000) starttime = 0;
-		return;
-	}
-	int t = dt % 122;
-	int bp = 0;
-	if (t >= 41) bp = 1;
-	if (t >= 81) bp = 2;
-	switch (bp) {
-		case 0: IHCOutput::pTheOneAndOnly->Set(channel, HIGH); break;
-		case 1: {
-			int bytenr = bitnr / 8;
-			int bit = bitnr % 8;
-			if ((data[bytenr] & (1 << bit)) == 0)
-				IHCOutput::pTheOneAndOnly->Set(channel, LOW);
-			break;
-		}
-		case 2: 
-			IHCOutput::pTheOneAndOnly->Set(channel, LOW); 
-			break;
-	}
-}
-
-void IHCOutput::IHCTemperature::AddBits(word value, int bits) {
-
-	word valuemask = 0x01 << (bits - 1);
-	int i = bitpos / 8;
-	int bitofs = bitpos % 8;
-	uint8_t mask = 1 << bitofs;
-	do {
-		if (value & valuemask) {
-			data[i] |= mask;;
-		}
-		bitpos++;
-		if ( (mask <<= 1) == 0) {
-			i++;
-			mask = 1;
-		}
-	} while (valuemask >>= 1);
-}
-
-
-IHCOutput::IHCOutput() {
-
-	pTheOneAndOnly = this;
 	output = 0;
 	outputp = 0;
+#ifndef IHC_NOTEMPERATURE
 	TemperatureToProcess = NULL;
 	FirstTemperature = NULL;
+#endif
 }
 
 
-IHCOutput::~IHCOutput() {
+IHCoutput::~IHCoutput() {
 }
 
-#ifdef ESP8266
+#ifndef ESP8266
 
-uint32_t usToTicks(uint32_t us) {
-	return (clockCyclesPerMicrosecond() * us / 256);     // converts microseconds to tick
-}
-
-void EspTimerInterrupt() {
-	IHCOutput::pTheOneAndOnly->Tick();
-}
-
-#else
 ISR(TIMER2_COMPA_vect) {
-	IHCOutput::pTheOneAndOnly->Tick();
+
+	IHCoutput::Interrupt();
 }
 #endif
 
 
+void  ICACHE_RAM_ATTR IHCoutput::Interrupt() {
 
-void IHCOutput::Begin(int pin) {
+	IHCoutput* pOutput = pTheFirst;
+	while (pOutput != NULL) {
+		pOutput->Tick();
+		pOutput = pOutput->pNext;
+	}
+}
+
+
+void IHCoutput::Begin(int pin) {
 	
 	this->pin = pin;
 	pinMode(pin, OUTPUT);
 	digitalWrite(pin, IHC_HIGH);
 	pulsepos = -30;
 	outputmask = 0x01;
+
+	pNext = pTheFirst;
+	pTheFirst = this;
+	if (pNext != NULL) return;
+
 #ifdef ESP8266
 	timer1_isr_init();
-	timer1_attachInterrupt(EspTimerInterrupt);
+	timer1_attachInterrupt(Interrupt);
 
 	timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
 	timer1_write( 777);
@@ -164,18 +97,19 @@ void IHCOutput::Begin(int pin) {
 }
 
 
-
-void IHCOutput::Tick() {
+void IHCoutput::Tick() {
 
 	if (++pulsepos < 0) {
+#ifndef IHC_NOTEMPERATURE
 		if (TemperatureToProcess) {
 			TemperatureToProcess->Tick();
 			TemperatureToProcess = TemperatureToProcess->next;
 		}
+#endif
 		return;
 	}
 	if (pulsepos == 0) {
-		// take a snapshot of the current output
+		// make a snapshot of the current output
 		outputp = output;
 		outputmask = 0x01;
 		// Calculate the parity
@@ -195,7 +129,9 @@ void IHCOutput::Tick() {
 		digitalWrite(pin, IHC_HIGH);
 		if (pulsepos >= 4 * 17) {
 			pulsepos = -30;
+#ifndef IHC_NOTEMPERATURE
 			TemperatureToProcess = FirstTemperature;
+#endif
 			return;
 		}
 	}
@@ -207,12 +143,13 @@ void IHCOutput::Tick() {
 	}
 }
 
-void IHCOutput::SetOutput(word output) {
+
+void IHCoutput::SetOutput(word output) {
 
 	this->output = output;
 }
 
-void IHCOutput::Set(int channel, int state) {
+void IHCoutput::Set(int channel, int state) {
 
 	if (state == LOW) {
 		output &=  ~(0x01 << channel);
@@ -222,10 +159,13 @@ void IHCOutput::Set(int channel, int state) {
 	}
 }
 
-void IHCOutput::AddTemperature(IHCTemperature& temp) {
+#ifndef IHC_NOTEMPERATURE
+
+void IHCoutput::AddTemperature(IHCtemperature& temp) {
 
 	temp.next = FirstTemperature;
 	FirstTemperature = &temp;
+	temp.ihcoutput = this;
 }
 
-
+#endif

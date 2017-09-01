@@ -1,5 +1,25 @@
-#ifndef _ihcoutput_h
-#define _ihcoutput_h
+/*
+(C) 2015 dingus.dk J.Ø.N.
+
+This file is part of ArduinoIHC.
+
+ArduinoIHC is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+ArduinoIHC is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with ArduinoIHC.  If not, see <http://www.gnu.org/licenses/>.
+-------------------------------------------------------------------------------
+
+*/
+#ifndef _IHCoutput_h
+#define _IHCoutput_h
 
 typedef unsigned long dword;
 
@@ -9,42 +29,9 @@ typedef unsigned long dword;
 #define IHC_LOW 0
 #define IHC_HIGH 1
 
+class IHCtemperature;
 
-class IHCOutput {
-
-public:
-
-	class IHCTemperature {
-
-		int channel;
-		float temperature;
-		float humidity;
-		float gulvtemp;
-		bool gulvibrug;
-
-		IHCTemperature* next;
-
-		uint8_t data[9];
-		int bitpos;
-		unsigned long starttime;
-			
-		friend class IHCOutput;
-
-		void Init();
-		void Tick();
-
-		void AddBits(word value, int bits = 12);
-
-	public:
-		
-		IHCTemperature( int ch);
-
-		void SetTemperature(float t) { temperature = t;  }
-		void SetHumidity(float h) { humidity = h; }
-		void SetSecondTemperature(float t) { gulvtemp = t; gulvibrug = true; }
-
-		int GetChannel() { return channel; }
-	};
+class IHCoutput {
 
 protected:
 
@@ -56,27 +43,34 @@ protected:
 	// a bit mask for the bit we are sending
 	dword outputmask;
 	dword outputp;
+	IHCoutput* pNext;
 
-	IHCTemperature* FirstTemperature;
-	IHCTemperature* TemperatureToProcess;
+#ifndef IHC_NOTEMPERATURE
+	IHCtemperature* FirstTemperature;
+	IHCtemperature* TemperatureToProcess;
+#endif
 
-	void SendBits(int channel, int value, int bits = 12);
+	static IHCoutput* pTheFirst;
 
-public:
-	static IHCOutput* pTheOneAndOnly;
 	void Tick();
 
-	IHCOutput();
-	virtual ~IHCOutput();
+public:
+
+	static void Interrupt();
+
+	IHCoutput();
+	virtual ~IHCoutput();
 
 	void Begin(int pin);
 	void SetOutput(word output);
-
 	void Set(int channel, int state);
-	void AddTemperature(IHCTemperature& temp);
+
+#ifndef IHC_NOTEMPERATURE
+	void AddTemperature(IHCtemperature& temp);
+#endif
 };
 
 
-extern IHCOutput TheIHCOutput;
+extern IHCoutput TheIHCoutput;
 
 #endif
