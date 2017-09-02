@@ -21,8 +21,8 @@ This example will create 2 IHCOutput on arduino port 2 and 3. Port 2 will count,
 and port 3 will shift 1 bit. 
 
 */
-#include <arduino.h>
-#include <IHCoutput.h>
+#include <Arduino.h>
+#include <IHCOutput.h>
 
 IHCoutput output1;
 IHCoutput output2;

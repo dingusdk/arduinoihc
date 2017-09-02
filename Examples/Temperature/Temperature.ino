@@ -18,8 +18,8 @@ along with ArduinoIHC.  If not, see <http://www.gnu.org/licenses/>.
 -------------------------------------------------------------------------------
 
 */
-#include <arduino.h>
-#include <IHCoutput.h>
+#include <Arduino.h>
+#include <IHCOutput.h>
 #include <IHCtemperature.h>
 
 IHCoutput output;
