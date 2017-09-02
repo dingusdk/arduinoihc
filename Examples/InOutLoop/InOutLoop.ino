@@ -22,9 +22,9 @@ You should connect port 2 to an IHC controler output and
 connect pin 13 to an IHC controller input.
 
 */
-#include <arduino.h>
-#include <IHCinput.h>
-#include <IHCoutput.h>
+#include <Arduino.h>
+#include <IHCInput.h>
+#include <IHCOutput.h>
 
 IHCinput ihcinput;
 IHCoutput ihcoutput;

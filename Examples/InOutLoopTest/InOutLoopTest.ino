@@ -23,9 +23,9 @@ The output will count up and print the result on the serial port.
 The input will also be printed on the serial port.
 If the input and output does not match "ERROR" is printed on the serial port
 */
-#include <arduino.h>
-#include <IHCinput.h>
-#include <IHCoutput.h>
+#include <Arduino.h>
+#include <IHCInput.h>
+#include <IHCOutput.h>
 
 IHCinput ihcinput;
 IHCoutput ihcoutput;

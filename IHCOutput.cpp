@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with ArduinoIHC.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <Arduino.h>
-#include "IHCoutput.h"
+#include "IHCOutput.h"
 #ifndef IHC_NOTEMPERATURE
 #include <IHCtemperature.h>
 #endif

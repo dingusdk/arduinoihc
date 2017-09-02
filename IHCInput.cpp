@@ -25,7 +25,7 @@ along with ArduinoIHC.  If not, see <http://www.gnu.org/licenses/>.
 		#include <pcint.h>
 	#endif
 #endif
-#include "IHCinput.h"
+#include "IHCInput.h"
 
 #define STARTPULSELENGTH 2500
 #define MAXPULSELENGTH 400
