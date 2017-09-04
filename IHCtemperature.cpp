@@ -23,7 +23,7 @@ along with ArduinoIHC.  If not, see <http://www.gnu.org/licenses/>.
 IHCtemperature::IHCtemperature(int ch) {
 
 	channel = ch;
-	memset( &data, 0, sizeof(data));
+	memset(&data, 0, sizeof(data));
 	bitpos = 0;
 	temperature = gulvtemp = humidity = 0;
 	gulvibrug = false;
@@ -42,8 +42,8 @@ void IHCtemperature::Init() {
 	int h = int(humidity * 10.0);
 	int gulv = int(gulvtemp * 10.0);
 	word checksum_rum = NibbleChecksum(rum);
-	word checksum_h = NibbleChecksum( h);
-	word checksum_gulv = NibbleChecksum( gulv);
+	word checksum_h = NibbleChecksum(h);
+	word checksum_gulv = NibbleChecksum(gulv);
 	word checksum_5bit = ((checksum_rum + checksum_h + checksum_gulv) & 0x001F);
 	if (gulvibrug)
 		checksum_5bit = checksum_5bit & 0x000F;
@@ -81,17 +81,17 @@ void IHCtemperature::Tick() {
 	if (t >= 41) bp = 1;
 	if (t >= 81) bp = 2;
 	switch (bp) {
-		case 0: ihcoutput->Set(channel, HIGH); break;
-		case 1: {
-			int bytenr = bitnr / 8;
-			int bit = bitnr % 8;
-			if ((data[bytenr] & (1 << bit)) == 0)
-				ihcoutput->Set(channel, LOW);
-			break;
-		}
-		case 2: 
+	case 0: ihcoutput->Set(channel, HIGH); break;
+	case 1: {
+		int bytenr = bitnr / 8;
+		int bit = bitnr % 8;
+		if ((data[bytenr] & (1 << bit)) == 0)
 			ihcoutput->Set(channel, LOW);
-			break;
+		break;
+	}
+	case 2:
+		ihcoutput->Set(channel, LOW);
+		break;
 	}
 }
 
@@ -107,7 +107,7 @@ void IHCtemperature::AddBits(word value, int bits) {
 			data[i] |= mask;;
 		}
 		bitpos++;
-		if ( (mask <<= 1) == 0) {
+		if ((mask <<= 1) == 0) {
 			i++;
 			mask = 1;
 		}

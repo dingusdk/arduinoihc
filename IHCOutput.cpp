@@ -48,7 +48,11 @@ ISR(TIMER2_COMPA_vect) {
 #endif
 
 
+#ifdef ESP8266
 void  ICACHE_RAM_ATTR IHCoutput::Interrupt() {
+#else
+void  IHCoutput::Interrupt() {
+#endif
 
 	IHCoutput* pOutput = pTheFirst;
 	while (pOutput != NULL) {

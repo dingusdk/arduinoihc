@@ -73,7 +73,11 @@ void IHCinput::Begin( int pin) {
 }
 
 
+#ifdef ESP8266
 void ICACHE_RAM_ATTR IHCinput::_PinChangeInterrupt() {
+#else
+void IHCinput::_PinChangeInterrupt() {
+#endif
 
 	IHCinput* pInput = pTheFirst;
 #ifdef ESP8266
