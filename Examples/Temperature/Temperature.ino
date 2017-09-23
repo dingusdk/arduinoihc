@@ -1,5 +1,5 @@
 /*
-(C) 2015 dingus.dk J.Ø.N.
+(C) 2015 dingus.dk J.Ã˜.N.
 
 This file is part of ArduinoIHC.
 
