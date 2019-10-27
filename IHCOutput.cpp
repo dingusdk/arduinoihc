@@ -75,9 +75,9 @@ void IHCoutput::Begin(int pin) {
 	if (pNext != NULL) return;
 
 #ifdef ESP8266
-	timer1_isr_init();
+	timer1_disable();
 	timer1_attachInterrupt(Interrupt);
-
+	timer1_isr_init();
 	timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
 	timer1_write( 777);
 #else
@@ -100,6 +100,20 @@ void IHCoutput::Begin(int pin) {
 #endif
 }
 
+inline void FastDigitalWrite(uint8_t pin, uint8_t val) {
+#ifdef ESP8266
+	if (pin < 16) {
+		if (val) GPOS = (1 << pin);
+		else GPOC = (1 << pin);
+	}
+	else if (pin == 16) {
+		if (val) GP16O |= 1;
+		else GP16O &= ~1;
+	}
+#else
+	digitalWrite(pin, val);
+#endif
+}
 
 void IHCoutput::Tick() {
 
@@ -127,10 +141,10 @@ void IHCoutput::Tick() {
 	}
 	if ((pulsepos & 0x3) == 0) {
 		// Start of each bit
-		digitalWrite(pin, IHC_LOW);
+		FastDigitalWrite(pin, IHC_LOW);
 	}
 	if ((pulsepos & 0x3) == 2) {
-		digitalWrite(pin, IHC_HIGH);
+		FastDigitalWrite(pin, IHC_HIGH);
 		if (pulsepos >= 4 * 17) {
 			pulsepos = -30;
 #ifndef IHC_NOTEMPERATURE
@@ -141,7 +155,7 @@ void IHCoutput::Tick() {
 	}
 	if ((pulsepos & 0x3) == 3) {
 		if (outputp & outputmask) {
-			digitalWrite(pin, IHC_LOW);
+			FastDigitalWrite(pin, IHC_LOW);
 		}
 		outputmask <<= 1;
 	}

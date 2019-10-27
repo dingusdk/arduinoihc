@@ -56,7 +56,11 @@ protected:
 
 public:
 
-	static void Interrupt();
+#ifdef ESP8266
+	static void  ICACHE_RAM_ATTR Interrupt();
+#else
+	static void  Interrupt();
+#endif
 
 	IHCoutput();
 	virtual ~IHCoutput();

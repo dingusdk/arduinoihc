@@ -62,7 +62,11 @@ protected:
 #endif
 	static IHCinput* pTheFirst;
 
+#ifdef ESP8266
+	static void ICACHE_RAM_ATTR _PinChangeInterrupt();
+#else
 	static void _PinChangeInterrupt();
+#endif
 	void PinChangeInterrupt( byte pinstate);
 
 #ifndef IHCINPUT_NO_CALLBACK
