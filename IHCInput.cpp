@@ -28,8 +28,11 @@ along with ArduinoIHC.  If not, see <http://www.gnu.org/licenses/>.
 #include "IHCInput.h"
 
 #define STARTPULSELENGTH 2500
-#define MAXPULSELENGTH 400
-#define THRESSHOLDPULSELENGTH 236
+#define MAXPULSELENGTH 330
+#define MINPULSELENGTH 149
+#define THRESSHOLDPULSELENGTHLOW 166
+#define THRESSHOLDPULSELENGTHHIGH 294
+#define MINPULSESPACE 300
 
 IHCinput* IHCinput::pTheFirst = NULL;
 
@@ -103,25 +106,47 @@ void IHCinput::PinChangeInterrupt(byte pinstate) {
 	unsigned long time = micros();
 	if (pinstate) {
 		startpulse = time;
+		if (dataline >= 0) {
+			unsigned long l = time - endpulse;
+			if (l < MINPULSESPACE) {
+				dataline = -1;
+				return;
+			}
+		}
 	}
 	else {
+		endpulse = time;
 		// pulse length
 		unsigned long l = time - startpulse;
-		// Start pulse ?
+		// Looking for start pulse ?
 		if (dataline < 0) {
 			if (l > STARTPULSELENGTH) {
 				// We have a start
 				dataline = 0;
 				newinput = 0;
 				parity = 0;
+#ifdef _DEBUG
+				pulsecount++;
+#endif
 			}
 		}
 		else {
-			if (l > MAXPULSELENGTH) {
+			if (l > MAXPULSELENGTH || l < MINPULSELENGTH ||
+				(l > THRESSHOLDPULSELENGTHLOW && l < THRESSHOLDPULSELENGTHHIGH)) {
 				// if the pulse is more than 300 it is an error - wait for new start pulse
 				dataline = -1;
 				return;
 			}
+#ifdef _DEBUG
+			if (l < (THRESSHOLDPULSELENGTHHIGH + THRESSHOLDPULSELENGTHLOW) / 2) {
+				if (l < lowmin) lowmin = l;
+				if (l > lowmax) lowmax = l;
+			}
+			else {
+				if (l < highmin) highmin = l;
+				if (l > highmax) highmax = l;
+			}
+#endif
 			if (dataline >= 8) {
 				// We ignore bit 8-15
 				if (dataline == 16) {
@@ -129,7 +154,7 @@ void IHCinput::PinChangeInterrupt(byte pinstate) {
 					// done - now search for start pulse again
 					dataline = -1;
 					// parity error ?
-					if ((l > THRESSHOLDPULSELENGTH) ^ (parity & 0x01)) {
+					if ((l > THRESSHOLDPULSELENGTHHIGH) ^ (parity & 0x01)) {
 						return;
 					}
 					changemask |= input ^ newinput;
@@ -141,7 +166,7 @@ void IHCinput::PinChangeInterrupt(byte pinstate) {
 					}
 				}
 			}
-			else if (l < THRESSHOLDPULSELENGTH) {
+			else if (l < THRESSHOLDPULSELENGTHLOW) {
 				newinput |= 1 << dataline;
 				parity++;
 			}

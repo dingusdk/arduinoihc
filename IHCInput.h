@@ -52,6 +52,7 @@ protected:
 
 	byte pin;
 	volatile unsigned long startpulse;
+	volatile unsigned long endpulse;
 	volatile short int dataline;
 	volatile byte input;
 	volatile byte newinput;
