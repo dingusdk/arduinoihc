@@ -19,6 +19,9 @@ along with ArduinoIHC.  If not, see <http://www.gnu.org/licenses/>.
 #include "IHCOutput.h"
 #include "IHCtemperature.h"
 
+#define PULSELENGTH 122
+#define PULSE0 41
+#define PULSE1 81
 
 IHCtemperature::IHCtemperature(int ch) {
 
@@ -70,16 +73,16 @@ void IHCtemperature::Tick() {
 	}
 	unsigned long time = millis();
 	long dt = time - starttime;
-	int bitnr = dt / 122;
+	int bitnr = dt / PULSELENGTH;
 	if (bitnr >= 41) {
-		// Wait 8 sec until next update
-		if (dt > 8000) starttime = 0;
+		// Wait 140ms sec until next update
+		if (dt > 5140) starttime = 0;
 		return;
 	}
-	int t = dt % 122;
+	int t = dt % PULSELENGTH;
 	int bp = 0;
-	if (t >= 41) bp = 1;
-	if (t >= 81) bp = 2;
+	if (t >= PULSE0) bp = 1;
+	if (t >= PULSE1) bp = 2;
 	switch (bp) {
 	case 0: ihcoutput->Set(channel, HIGH); break;
 	case 1: {
